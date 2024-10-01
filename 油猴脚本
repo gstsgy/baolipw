@@ -1,0 +1,136 @@
+// ==UserScript==
+// @name         保利票务
+// @namespace    http://tampermonkey.net/
+// @version      2024-09-25
+// @description  try to take over the world!
+// @author       You
+// @match        https://www.polyt.cn/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=polyt.cn
+// @grant        none
+// ==/UserScript==
+
+(function () {
+    'use strict';
+    const allCount = 2;// 你要买几张
+    const onlyCoiled = true;// 是否只要连坐
+    const orders = ['280', '380', '480','680'];// 要买什么价位 优先280 然后340 最后 420
+
+    const name = '追寻';// 取票人
+    const phone = '18721306064';// 取票人电话
+    const payType = '微信';// 支付方式 只支持微信 或者 支付宝
+
+
+    setInterval(()=>{
+        // 判断当前url
+        const url = window.location.href;
+        if(url.includes('selectPurchase/selectSeat?')){
+            // 买票规则 优先连坐 然后会根据优先级买
+            setTimeout(() => {
+                const priceListAll = document.querySelectorAll('.price-list');
+                const priceColor = new Map();
+                priceListAll.forEach(item=>{
+                    priceColor.set(item.querySelector('.price-amount').innerText.replace('￥','').trim(),item.querySelector('p').style.color);
+                })
+
+
+                const map1 = new Map(); // 普通票
+                const map2 = new Map();// 连坐票
+                orders.forEach(it => {
+                    map1.set(it, [])
+                    map2.set(it, [])
+                })
+
+                const liall = document.querySelectorAll('#seatBox li');
+                let preIsavailable = false; // 上一个是否有票
+                let isCoiled = false;
+
+
+
+                liall.forEach(li => {
+
+                    if (li.classList.contains('seat-item') && !li.classList.contains('unavailable')) {
+                        //先判断属于那个区域
+                        let region = undefined;
+                        orders.forEach(it => {
+                            if(li.style.color ===priceColor.get(it)){
+                                region = it;
+                            }
+                        })
+
+                        if (preIsavailable) {
+                            const tmparr = map1.get(region);
+                            if (tmparr.length > 0) {
+                                if(!isCoiled){
+                                    map2.get(region).push(tmparr[tmparr.length - 1]);
+                                }
+                                map2.get(region).push(li);
+                            }
+                            isCoiled = true;
+                        }
+                        map1.get(region).push(li);
+                        preIsavailable = true;
+                    } else {
+                        preIsavailable = false;
+                        isCoiled = false;
+                    }
+                });
+                let find = false;
+
+                for (let order of orders) {
+                    const tempArr = map2.get(order);
+                    if (tempArr.length > allCount - 1) {
+                        find = true;
+                        const e = document.createEvent("MouseEvents");
+                        e.initEvent("click", true, true);
+                        for (let i = 0; i < allCount; i++) {
+                            tempArr[i].dispatchEvent(e);
+                        }
+                        document.querySelector('.el-button--primary').dispatchEvent(e);
+                        break
+                    }
+                }
+
+                if (!onlyCoiled&&!find) {
+                    for (let order of orders) {
+                        const tempArr = map1.get(order);
+                        if (tempArr.length > 1) {
+                            find = true;
+                            const e = document.createEvent("MouseEvents");
+                            e.initEvent("click", true, true);
+                            tempArr[0].dispatchEvent(e);
+                            tempArr[1].dispatchEvent(e);
+                            document.querySelector('.el-button--primary').dispatchEvent(e);
+                            break
+                        }
+                    }
+                }
+
+                if (!find) {
+                    location.reload();
+                }
+            }, 1000)
+        }
+        if(url.includes('order/orderDetail')){
+            setTimeout(() => {
+                let evt = document.createEvent('HTMLEvents');
+                evt.initEvent('input', true, true);
+                const nameDiv = document.querySelector('#pane-self > div > div.public-form.mg-b-40.el-col.el-col-24 > form > div:nth-child(1) > div > div > input');
+                nameDiv.value = name;
+                nameDiv.dispatchEvent(evt);
+                const phoneEle = document.querySelector('#pane-self > div > div.public-form.mg-b-40.el-col.el-col-24 > form > div.el-form-item.mg-b-20.is-required > div > div > input');
+                phoneEle.value = phone;
+                phoneEle.dispatchEvent(evt);
+                const e = document.createEvent("MouseEvents");
+                e.initEvent("click", true, true);
+                if(payType==='支付宝'){
+                    document.querySelector('body > div:nth-child(2) > div > section > div.main.el-main-argin-auto > div.order-manage-container > div > div.payment.el-row > div.pay-list.el-row > div:nth-child(2)').dispatchEvent(e);
+                }else{
+                    document.querySelector('body > div:nth-child(2) > div > section > div.main.el-main-argin-auto > div.order-manage-container > div > div.payment.el-row > div.pay-list.el-row > div:nth-child(1)').dispatchEvent(e);
+                }
+                document.querySelector('body > div:nth-child(2) > div > section > div.main.el-main-argin-auto > div.order-manage-container > div > div.account-has-bg.el-row > div.agree.el-col.el-col-24 > label > span.el-checkbox__input').dispatchEvent(e); // 勾选
+                document.querySelector('body > div:nth-child(2) > div > section > div.main.el-main-argin-auto > div.order-manage-container > div > div.account-has-bg.el-row > button').dispatchEvent(e);// 提交
+            }, 1000)
+        }
+    },2000)
+
+})();
